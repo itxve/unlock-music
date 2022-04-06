@@ -8,29 +8,25 @@ import {
   SniffAudioExt,
   WriteMetaToFlac,
   WriteMetaToMp3,
-} from "@/decrypt/utils.ts";
-import { parseBlob as metaParseBlob } from "music-metadata-browser";
-import jimp from "jimp";
+} from '@/decrypt/utils';
+import { parseBlob as metaParseBlob } from 'music-metadata-browser';
+import jimp from 'jimp';
 
-import AES from "crypto-js/aes";
-import PKCS7 from "crypto-js/pad-pkcs7";
-import ModeECB from "crypto-js/mode-ecb";
-import WordArray from "crypto-js/lib-typedarrays";
-import Base64 from "crypto-js/enc-base64";
-import EncUTF8 from "crypto-js/enc-utf8";
-import EncHex from "crypto-js/enc-hex";
+import AES from 'crypto-js/aes';
+import PKCS7 from 'crypto-js/pad-pkcs7';
+import ModeECB from 'crypto-js/mode-ecb';
+import WordArray from 'crypto-js/lib-typedarrays';
+import Base64 from 'crypto-js/enc-base64';
+import EncUTF8 from 'crypto-js/enc-utf8';
+import EncHex from 'crypto-js/enc-hex';
 
-import { DecryptResult } from "@/decrypt/entity";
+import { DecryptResult } from '@/decrypt/entity';
 
-const CORE_KEY = EncHex.parse("687a4852416d736f356b496e62617857");
-const META_KEY = EncHex.parse("2331346C6A6B5F215C5D2630553C2728");
+const CORE_KEY = EncHex.parse('687a4852416d736f356b496e62617857');
+const META_KEY = EncHex.parse('2331346C6A6B5F215C5D2630553C2728');
 const MagicHeader = [0x43, 0x54, 0x45, 0x4e, 0x46, 0x44, 0x41, 0x4d];
 
-export async function Decrypt(
-  file: File,
-  raw_filename: string,
-  _: string
-): Promise<DecryptResult> {
+export async function Decrypt(file: File, raw_filename: string, _: string): Promise<DecryptResult> {
   return new NcmDecrypt(await GetArrayBuffer(file), raw_filename).decrypt();
 }
 
@@ -52,8 +48,8 @@ class NcmDecrypt {
   view: DataView;
   offset: number = 0;
   filename: string;
-  format: string = "";
-  mime: string = "";
+  format: string = '';
+  mime: string = '';
   audio?: Uint8Array;
   blob?: Blob;
   oriMeta?: NcmMusicMeta;
@@ -62,7 +58,7 @@ class NcmDecrypt {
 
   constructor(buf: ArrayBuffer, filename: string) {
     const prefix = new Uint8Array(buf, 0, 8);
-    if (!BytesHasPrefix(prefix, MagicHeader)) throw Error("此ncm文件已损坏");
+    if (!BytesHasPrefix(prefix, MagicHeader)) throw Error('此ncm文件已损坏');
     this.offset = 10;
     this.raw = buf;
     this.view = new DataView(buf);
@@ -72,16 +68,14 @@ class NcmDecrypt {
   _getKeyData(): Uint8Array {
     const keyLen = this.view.getUint32(this.offset, true);
     this.offset += 4;
-    const cipherText = new Uint8Array(this.raw, this.offset, keyLen).map(
-      (uint8) => uint8 ^ 0x64
-    );
+    const cipherText = new Uint8Array(this.raw, this.offset, keyLen).map((uint8) => uint8 ^ 0x64);
     this.offset += keyLen;
 
     const plainText = AES.decrypt(
       // @ts-ignore
       { ciphertext: WordArray.create(cipherText) },
       CORE_KEY,
-      { mode: ModeECB, padding: PKCS7 }
+      { mode: ModeECB, padding: PKCS7 },
     );
 
     const result = new Uint8Array(plainText.sigBytes);
@@ -121,9 +115,7 @@ class NcmDecrypt {
     this.offset += 4;
     if (metaDataLen === 0) return {};
 
-    const cipherText = new Uint8Array(this.raw, this.offset, metaDataLen).map(
-      (data) => data ^ 0x63
-    );
+    const cipherText = new Uint8Array(this.raw, this.offset, metaDataLen).map((data) => data ^ 0x63);
     this.offset += metaDataLen;
 
     WordArray.create();
@@ -132,24 +124,23 @@ class NcmDecrypt {
       {
         ciphertext: Base64.parse(
           // @ts-ignore
-          WordArray.create(cipherText.slice(22)).toString(EncUTF8)
+          WordArray.create(cipherText.slice(22)).toString(EncUTF8),
         ),
       },
       META_KEY,
-      { mode: ModeECB, padding: PKCS7 }
+      { mode: ModeECB, padding: PKCS7 },
     ).toString(EncUTF8);
 
-    const labelIndex = plainText.indexOf(":");
+    const labelIndex = plainText.indexOf(':');
     let result: NcmMusicMeta;
-    if (plainText.slice(0, labelIndex) === "dj") {
+    if (plainText.slice(0, labelIndex) === 'dj') {
       const tmp: NcmDjMeta = JSON.parse(plainText.slice(labelIndex + 1));
       result = tmp.mainMusic;
     } else {
       result = JSON.parse(plainText.slice(labelIndex + 1));
     }
     if (!!result.albumPic) {
-      result.albumPic =
-        result.albumPic.replace("http://", "https://") + "?param=500y500";
+      result.albumPic = result.albumPic.replace('http://', 'https://') + '?param=500y500';
     }
     return result;
   }
@@ -158,13 +149,12 @@ class NcmDecrypt {
     this.offset += this.view.getUint32(this.offset + 5, true) + 13;
     const audioData = new Uint8Array(this.raw, this.offset);
     let lenAudioData = audioData.length;
-    for (let cur = 0; cur < lenAudioData; ++cur)
-      audioData[cur] ^= keyBox[cur & 0xff];
+    for (let cur = 0; cur < lenAudioData; ++cur) audioData[cur] ^= keyBox[cur & 0xff];
     return audioData;
   }
 
   async _buildMeta() {
-    if (!this.oriMeta) throw Error("invalid sequence");
+    if (!this.oriMeta) throw Error('invalid sequence');
 
     const info = GetMetaFromFile(this.filename, this.oriMeta.musicName);
 
@@ -176,9 +166,9 @@ class NcmDecrypt {
 
     if (artists.length === 0 && !!info.artist) {
       artists = info.artist
-        .split(",")
+        .split(',')
         .map((val) => val.trim())
-        .filter((val) => val != "");
+        .filter((val) => val != '');
     }
 
     if (this.oriMeta.albumPic)
@@ -187,10 +177,10 @@ class NcmDecrypt {
         while (this.image && this.image.buffer.byteLength >= 1 << 24) {
           let img = await jimp.read(Buffer.from(this.image.buffer));
           await img.resize(Math.round(img.getHeight() / 2), jimp.AUTO);
-          this.image.buffer = await img.getBufferAsync("image/jpeg");
+          this.image.buffer = await img.getBufferAsync('image/jpeg');
         }
       } catch (e) {
-        console.log("get cover image failed", e);
+        console.log('get cover image failed', e);
       }
 
     this.newMeta = {
@@ -202,26 +192,19 @@ class NcmDecrypt {
   }
 
   async _writeMeta() {
-    if (!this.audio || !this.newMeta) throw Error("invalid sequence");
+    if (!this.audio || !this.newMeta) throw Error('invalid sequence');
 
     if (!this.blob) this.blob = new Blob([this.audio], { type: this.mime });
     const ori = await metaParseBlob(this.blob);
-    let shouldWrite =
-      !ori.common.album && !ori.common.artists && !ori.common.title;
+    let shouldWrite = !ori.common.album && !ori.common.artists && !ori.common.title;
     if (shouldWrite || this.newMeta.picture) {
-      if (this.format === "mp3") {
+      if (this.format === 'mp3') {
         this.audio = WriteMetaToMp3(Buffer.from(this.audio), this.newMeta, ori);
-      } else if (this.format === "flac") {
-        this.audio = WriteMetaToFlac(
-          Buffer.from(this.audio),
-          this.newMeta,
-          ori
-        );
+      } else if (this.format === 'flac') {
+        this.audio = WriteMetaToFlac(Buffer.from(this.audio), this.newMeta, ori);
         debugger;
       } else {
-        console.info(
-          `writing meta for ${this.format} is not being supported for now`
-        );
+        console.info(`writing meta for ${this.format} is not being supported for now`);
         return;
       }
       this.blob = new Blob([this.audio], { type: this.mime });
@@ -229,14 +212,14 @@ class NcmDecrypt {
   }
 
   gatherResult(): DecryptResult {
-    if (!this.newMeta) throw Error("bad sequence");
+    if (!this.newMeta) throw Error('bad sequence');
     return {
       title: this.newMeta.title,
-      artist: this.newMeta.artists?.join("; "),
+      artist: this.newMeta.artists?.join('; '),
       ext: this.format,
       album: this.newMeta.album,
       picture: this.image?.url,
-      file: URL.createObjectURL(this.blob),
+      file: URL.createObjectURL(this.blob!),
       blob: this.blob as Blob,
       mime: this.mime,
     };
@@ -252,7 +235,7 @@ class NcmDecrypt {
     try {
       await this._writeMeta();
     } catch (e) {
-      console.warn("write meta data failed", e);
+      console.warn('write meta data failed', e);
     }
     return this.gatherResult();
   }
