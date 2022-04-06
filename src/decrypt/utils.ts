@@ -154,7 +154,9 @@ export function WriteMetaToMp3(audioData: Buffer, info: IMusicMeta, original: IA
 export function WriteMetaToFlac(audioData: Buffer, info: IMusicMeta, original: IAudioMetadata) {
   const writer = new MetaFlac(audioData);
   const old = original.common;
-  if (!old.title && !old.album && old.artists) {
+  debugger;
+
+  if (!old.title && !old.album && !old.artists) {
     writer.setTag('TITLE=' + info.title);
     writer.setTag('ALBUM=' + info.album);
     if (info.artists) {
@@ -166,6 +168,7 @@ export function WriteMetaToFlac(audioData: Buffer, info: IMusicMeta, original: I
   if (info.picture) {
     writer.importPictureFromBuffer(Buffer.from(info.picture));
   }
+
   return writer.save();
 }
 
